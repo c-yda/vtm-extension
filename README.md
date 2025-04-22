@@ -15,3 +15,5 @@ Follow these steps to download and load the extension into Chrome:
 5. Select the folder where you extracted the ZIP file.
 
 Done!
+
+![Image of modal](https://i.imgur.com/DDAmcbV.png)
