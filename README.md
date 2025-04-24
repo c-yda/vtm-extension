@@ -17,3 +17,4 @@ Follow these steps to download and load the extension into Chrome:
 Done!
 
 ![Image of modal](https://i.imgur.com/DDAmcbV.png)
+Hold down the middle mouse button to drag the modal, right-click it to reset its position
