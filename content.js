@@ -1,6 +1,8 @@
 (function() {
     'use strict';
 
+    const QA_COPY_BUTTON_ENABLED = false;
+
     // --- Configuration ---
     const TARGET_HOSTNAME = 'task-manager.biz';
     const TARGET_PATH_PREFIX = '/partner/';
@@ -9,7 +11,6 @@
     const RETRY_ACCOUNT_NAME_ENABLED = true; // Set to false to disable retries
     const MAX_ACCOUNT_NAME_RETRIES = 30;     // Number of retry attempts
     const ACCOUNT_NAME_RETRY_DELAY_MS = 600; // Delay between retries
-
     // LocalStorage Keys for Position
     const MODAL_POSITION_TOP_KEY = 'tmPartnerModalPosTop';
     const MODAL_POSITION_LEFT_KEY = 'tmPartnerModalPosLeft';
@@ -41,6 +42,7 @@
     const PARTNER_ID_VALUE_ID = 'tm-value-partner-id';
     const WSP_BUTTON_ID = 'tm-button-wsp';
     const PC_BUTTON_ID = 'tm-button-pc';
+    const QA_COPY_BUTTON_ID = 'tm-button-qa-copy'; // <<< NEW ID
 
     // --- State ---
     let updateTimeoutId = null;
@@ -52,10 +54,15 @@
     let offsetY = 0;
 
     // --- Initial HTML Structure ---
-    const MODAL_HTML = `<div id="${MODAL_ID}"><div class="tm-info-row"><span class="tm-label">Account:</span><span class="tm-value" id="${ACCOUNT_NAME_VALUE_ID}" title="N/A">N/A</span><button class="tm-copy-button" data-copy-target-id="${ACCOUNT_NAME_VALUE_ID}" title="Copy 'N/A'" disabled>Copy</button></div><div class="tm-info-row"><span class="tm-label">AGID:</span><span class="tm-value" id="${AGID_VALUE_ID}" title="N/A">N/A</span><button class="tm-copy-button" data-copy-target-id="${AGID_VALUE_ID}" title="Copy 'N/A'" disabled>Copy</button></div><div class="tm-info-row"><span class="tm-label">Partner ID:</span><span class="tm-value" id="${PARTNER_ID_VALUE_ID}" title="N/A">N/A</span><button class="tm-copy-button" data-copy-target-id="${PARTNER_ID_VALUE_ID}" title="Copy 'N/A'" disabled>Copy</button></div><div class="tm-info-row"><span class="tm-label" id="${TASK_PROJECT_LABEL_ID}">Task ID:</span><span class="tm-value" id="${TASK_PROJECT_VALUE_ID}" title="N/A">N/A</span><button class="tm-copy-button" data-copy-target-id="${TASK_PROJECT_VALUE_ID}" title="Copy 'N/A'" disabled>Copy</button></div><div class="tm-info-row tm-button-row"><div class="tm-button-row-container"><button id="${WSP_BUTTON_ID}" class="tm-external-link-button" title="Open WSP Dashboard (Requires AGID)" disabled>Website Pro</button><button id="${PC_BUTTON_ID}" class="tm-external-link-button" title="Open Partner Center (Requires AGID & Partner ID)" disabled>Partner Center</button></div></div></div>`;
+    // <<< MODIFIED: Conditionally add QA Button HTML
+    const qaButtonHtml = QA_COPY_BUTTON_ENABLED
+        ? `<button id="${QA_COPY_BUTTON_ID}" class="tm-external-link-button" title="Copy QA Info (Requires all fields)" disabled>Copy QA Info</button>`
+        : '';
+    const MODAL_HTML = `<div id="${MODAL_ID}"><div class="tm-info-row"><span class="tm-label">Account:</span><span class="tm-value" id="${ACCOUNT_NAME_VALUE_ID}" title="N/A">N/A</span><button class="tm-copy-button" data-copy-target-id="${ACCOUNT_NAME_VALUE_ID}" title="Copy 'N/A'" disabled>Copy</button></div><div class="tm-info-row"><span class="tm-label">AGID:</span><span class="tm-value" id="${AGID_VALUE_ID}" title="N/A">N/A</span><button class="tm-copy-button" data-copy-target-id="${AGID_VALUE_ID}" title="Copy 'N/A'" disabled>Copy</button></div><div class="tm-info-row"><span class="tm-label">Partner ID:</span><span class="tm-value" id="${PARTNER_ID_VALUE_ID}" title="N/A">N/A</span><button class="tm-copy-button" data-copy-target-id="${PARTNER_ID_VALUE_ID}" title="Copy 'N/A'" disabled>Copy</button></div><div class="tm-info-row"><span class="tm-label" id="${TASK_PROJECT_LABEL_ID}">Task ID:</span><span class="tm-value" id="${TASK_PROJECT_VALUE_ID}" title="N/A">N/A</span><button class="tm-copy-button" data-copy-target-id="${TASK_PROJECT_VALUE_ID}" title="Copy 'N/A'" disabled>Copy</button></div><div class="tm-info-row tm-button-row"><div class="tm-button-row-container"><button id="${WSP_BUTTON_ID}" class="tm-external-link-button" title="Open WSP Dashboard (Requires AGID)" disabled>Website Pro</button><button id="${PC_BUTTON_ID}" class="tm-external-link-button" title="Open Partner Center (Requires AGID & Partner ID)" disabled>Partner Center</button>${qaButtonHtml}</div></div></div>`;
 
     // --- CSS Styling ---
-    const MODAL_CSS = `#${MODAL_ID}{height: fit-content;} #${MODAL_ID} .tm-info-row button {pointer-events:all!important;}#${MODAL_ID} .tm-info-row {pointer-events:none;}#${MODAL_ID}{position:fixed;bottom:20px;left:20px;background-color:rgba(0,0,0,.7);color:#fff;padding:15px;border-radius:5px;z-index:10001;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",sans-serif;font-size:13px;max-width:350px;box-shadow:0 4px 12px rgba(0,0,0,.5);line-height:1.5;opacity:.95;transition:opacity .2s ease-in-out, bottom 0s, left 0s, top 0s; /* Disable transition for position */ cursor: move; user-select: none;}#${MODAL_ID}:hover{opacity:1}#${MODAL_ID} .tm-info-row{margin-bottom:8px;display:flex;align-items:center;gap:8px}#${MODAL_ID} .tm-info-row:last-child{margin-bottom:0}#${MODAL_ID} .tm-button-row{margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);}#${MODAL_ID} .tm-button-row-container{display:flex;justify-content:space-between;gap:10px;width:100%;}#${MODAL_ID} .tm-label{font-weight:600;flex-shrink:0;opacity:.85;width:90px;text-align:right; cursor: default; user-select: text;}#${MODAL_ID} .tm-value{word-break:break-all;margin-right:5px;min-width:0;flex-grow:1;background-color:rgba(255,255,255,.1);padding:2px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; cursor: text; user-select: text;}#${MODAL_ID} .tm-copy-button, #${MODAL_ID} .tm-external-link-button{cursor:pointer;border:none;background-color:#5a5a5a;color:#e0e0e0;font-size:10px;padding:4px 8px;border-radius:3px;flex-shrink:0;vertical-align:middle;transition:background-color .15s ease,transform .1s ease;line-height:1; text-align: center; user-select: none;}#${MODAL_ID} .tm-copy-button { margin-left: auto; }#${MODAL_ID} .tm-external-link-button { flex-grow: 1; }#${MODAL_ID} .tm-copy-button:hover:not(:disabled), #${MODAL_ID} .tm-external-link-button:hover:not(:disabled){background-color:#777;transform:scale(1.05)}#${MODAL_ID} .tm-copy-button:active:not(:disabled), #${MODAL_ID} .tm-external-link-button:active:not(:disabled){transform:scale(.98)}#${MODAL_ID} .tm-copy-button:disabled, #${MODAL_ID} .tm-external-link-button:disabled{cursor:not-allowed;opacity:.5}#${MODAL_ID} .tm-copy-button.success{background-color:#28a745!important;color:#fff}#${MODAL_ID} .tm-copy-button.error{background-color:#dc3545!important;color:#fff}`;
+    // <<< MODIFIED: Ensure buttons space nicely (removed flex-grow from specific buttons, relying on container + gap)
+    const MODAL_CSS = `#${MODAL_ID}{height: fit-content;} #${MODAL_ID} .tm-info-row button {pointer-events:all!important;}#${MODAL_ID} .tm-info-row {pointer-events:none;}#${MODAL_ID}{position:fixed;bottom:20px;left:20px;background-color:rgba(0,0,0,.7);color:#fff;padding:15px;border-radius:5px;z-index:10001;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",sans-serif;font-size:13px;max-width:350px;box-shadow:0 4px 12px rgba(0,0,0,.5);line-height:1.5;opacity:.95;transition:opacity .2s ease-in-out, bottom 0s, left 0s, top 0s; /* Disable transition for position */ cursor: move; user-select: none;}#${MODAL_ID}:hover{opacity:1}#${MODAL_ID} .tm-info-row{margin-bottom:8px;display:flex;align-items:center;gap:8px}#${MODAL_ID} .tm-info-row:last-child{margin-bottom:0}#${MODAL_ID} .tm-button-row{margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);}#${MODAL_ID} .tm-button-row-container{display:flex;justify-content:space-between;gap:10px;width:100%;}#${MODAL_ID} .tm-label{font-weight:600;flex-shrink:0;opacity:.85;width:90px;text-align:right; cursor: default; user-select: text;}#${MODAL_ID} .tm-value{word-break:break-all;margin-right:5px;min-width:0;flex-grow:1;background-color:rgba(255,255,255,.1);padding:2px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; cursor: text; user-select: text;}#${MODAL_ID} .tm-copy-button, #${MODAL_ID} .tm-external-link-button{cursor:pointer;border:none;background-color:#5a5a5a;color:#e0e0e0;font-size:10px;padding:4px 8px;border-radius:3px;flex-shrink:0;vertical-align:middle;transition:background-color .15s ease,transform .1s ease;line-height:1; text-align: center; user-select: none; flex-grow: 1;}#${MODAL_ID} .tm-copy-button { margin-left: auto; flex-grow: 0; } /* Copy button shouldn't grow */ #${MODAL_ID} .tm-external-link-button:hover:not(:disabled){background-color:#777;transform:scale(1.05)}#${MODAL_ID} .tm-external-link-button:active:not(:disabled){transform:scale(.98)}#${MODAL_ID} .tm-copy-button:hover:not(:disabled) { background-color:#777; transform: scale(1.05) }#${MODAL_ID} .tm-copy-button:active:not(:disabled) { transform: scale(.98) }#${MODAL_ID} .tm-copy-button:disabled, #${MODAL_ID} .tm-external-link-button:disabled{cursor:not-allowed;opacity:.5}#${MODAL_ID} .tm-copy-button.success, #${MODAL_ID} .tm-external-link-button.success{background-color:#28a745!important;color:#fff}#${MODAL_ID} .tm-copy-button.error, #${MODAL_ID} .tm-external-link-button.error{background-color:#dc3545!important;color:#fff}`;
 
     // --- Helper Functions ---
     function ensureStylesInjected() { if (!document.getElementById(MODAL_STYLE_ID)) { const styleSheet = document.createElement("style"); styleSheet.id = MODAL_STYLE_ID; styleSheet.textContent = MODAL_CSS; document.head.appendChild(styleSheet); console.log("Partner Info Extractor: Styles injected."); } }
@@ -72,6 +79,10 @@
                 createdElement.querySelectorAll('.tm-copy-button').forEach(button => button.addEventListener('click', handleCopyClick));
                 createdElement.querySelector(`#${WSP_BUTTON_ID}`)?.addEventListener('click', handleExternalLinkClick);
                 createdElement.querySelector(`#${PC_BUTTON_ID}`)?.addEventListener('click', handleExternalLinkClick);
+                // <<< MODIFIED: Conditionally attach QA button listener
+                if (QA_COPY_BUTTON_ENABLED) {
+                    createdElement.querySelector(`#${QA_COPY_BUTTON_ID}`)?.addEventListener('click', handleQACopyClick);
+                }
                 createdElement.addEventListener('mousedown', handleMouseDown); // Drag start
                 createdElement.addEventListener('contextmenu', handleContextMenu); // Position reset
                 document.body.appendChild(createdElement);
@@ -141,6 +152,77 @@
         });
     }
 
+    // <<< NEW Function: Format Date for QA Copy
+    function formatDateForQA(date) {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const day = date.getDate(); // No zero-padding as per example
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        return `${month}-${day}-${year}`;
+    }
+
+    // <<< NEW Function: Handle QA Copy Click (MODIFIED FOR TAB SEPARATOR)
+    function handleQACopyClick(event) {
+        event.stopPropagation();
+        const button = event.target;
+        if (button.disabled || !button.dataset.partnerId || !button.dataset.agid || !button.dataset.accountName || !button.dataset.taskId) {
+            console.warn("QA Copy button clicked but required data is missing or button is disabled.");
+            return;
+        }
+
+        const partnerId = button.dataset.partnerId;
+        const agid = button.dataset.agid;
+        const accountName = button.dataset.accountName;
+        const taskId = button.dataset.taskId;
+
+        const currentDate = new Date();
+        const formattedDate = formatDateForQA(currentDate);
+
+        // <<< CHANGE: Use Tab ('\t') as the separator instead of comma (',')
+        const valueToCopy = `${formattedDate}\t${formattedDate}\t${partnerId}\t${agid}\t${accountName}\t${taskId}`;
+        const originalText = 'Copy QA Info';
+
+        navigator.clipboard.writeText(valueToCopy).then(() => {
+            button.textContent = 'Copied QA!';
+            button.classList.add('success');
+            button.classList.remove('error');
+            button.disabled = true; // Keep disabled temporarily after copy
+            setTimeout(() => {
+                // Re-enable only if data is still valid
+                if (button.dataset.partnerId && button.dataset.agid && button.dataset.accountName && button.dataset.taskId) {
+                   button.textContent = originalText;
+                   button.classList.remove('success');
+                   button.disabled = false;
+                } else {
+                    // Data became invalid while waiting
+                    button.textContent = originalText;
+                    button.classList.remove('success');
+                    // Leave it disabled, state update logic will handle title etc.
+                }
+            }, 1500);
+        }).catch(err => {
+            console.error('Failed to copy QA info: ', err);
+            button.textContent = 'Error QA';
+            button.classList.add('error');
+            button.classList.remove('success');
+            button.disabled = true; // Keep disabled temporarily after error
+             setTimeout(() => {
+                // Re-enable only if data is still valid
+                if (button.dataset.partnerId && button.dataset.agid && button.dataset.accountName && button.dataset.taskId) {
+                   button.textContent = originalText;
+                   button.classList.remove('error');
+                   button.disabled = false;
+                } else {
+                    // Data became invalid while waiting
+                    button.textContent = originalText;
+                    button.classList.remove('error');
+                    // Leave it disabled, state update logic will handle title etc.
+                }
+            }, 2000);
+        });
+    }
+
+
     function cancelAccountNameRetry() { if (accountNameRetryTimeoutId) { clearTimeout(accountNameRetryTimeoutId); accountNameRetryTimeoutId = null; accountNameRetryCount = 0; } }
 
     function extractAccountNameStandard() {
@@ -168,6 +250,11 @@
             if (newName !== 'N/A') {
                 console.log("Partner Info Extractor: Found Account Name on retry!");
                 updateModalRow(ACCOUNT_NAME_VALUE_ID, newName);
+                // <<< MODIFIED: Update QA button state after successful retry
+                const agid = modalElementCache.querySelector(`#${AGID_VALUE_ID}`)?.textContent ?? 'N/A';
+                const partnerId = modalElementCache.querySelector(`#${PARTNER_ID_VALUE_ID}`)?.textContent ?? 'N/A';
+                const taskId = modalElementCache.querySelector(`#${TASK_PROJECT_VALUE_ID}`)?.textContent ?? 'N/A';
+                updateQACopyButtonState(agid, partnerId, newName, taskId);
                 accountNameRetryCount = 0;
             } else {
                 accountNameRetryTimeoutId = setTimeout(tryAgainAccountName, ACCOUNT_NAME_RETRY_DELAY_MS);
@@ -216,6 +303,9 @@
         const pcButton = modalElementCache?.querySelector(`#${PC_BUTTON_ID}`);
         if (wspButton) { wspButton.disabled = true; wspButton.setAttribute('title', 'Open WSP Dashboard (Requires AGID)'); wspButton.removeAttribute('data-link-href'); }
         if (pcButton) { pcButton.disabled = true; pcButton.setAttribute('title', 'Open Partner Center (Requires AGID & Partner ID)'); pcButton.removeAttribute('data-link-href'); }
+
+        // <<< MODIFIED: Reset QA Button state
+        updateQACopyButtonState('N/A', 'N/A', 'N/A', 'N/A'); // Pass N/A values to ensure it disables
     }
 
     function handleExternalLinkClick(event) {
@@ -245,6 +335,48 @@
         const hasPartnerId = partnerId && partnerId !== 'N/A';
         if (wspButton) { if (hasAgid) { const wspUrl = WSP_URL_TEMPLATE.replace('{AGID}', encodeURIComponent(agid)); wspButton.disabled = false; wspButton.setAttribute('title', `Open WSP Dashboard for ${agid}`); wspButton.dataset.linkHref = wspUrl; } else { wspButton.disabled = true; wspButton.setAttribute('title', 'Open WSP Dashboard (Requires AGID)'); wspButton.removeAttribute('data-link-href'); } }
         if (pcButton) { if (hasAgid && hasPartnerId) { let pcUrl = PC_URL_TEMPLATE.replace('{AGID}', encodeURIComponent(agid)); pcUrl = pcUrl.replace('{PARTNER_ID}', encodeURIComponent(partnerId)); pcButton.disabled = false; pcButton.setAttribute('title', `Open Partner Center for ${agid} (PID: ${partnerId})`); pcButton.dataset.linkHref = pcUrl; } else { pcButton.disabled = true; let title = 'Open Partner Center'; if (!hasAgid && !hasPartnerId) title += ' (Requires AGID & Partner ID)'; else if (!hasAgid) title += ' (Requires AGID)'; else title += ' (Requires Partner ID)'; pcButton.setAttribute('title', title); pcButton.removeAttribute('data-link-href'); } }
+    }
+
+    // <<< NEW Function: Update QA Copy Button State
+    function updateQACopyButtonState(agid, partnerId, accountName, taskId) {
+        if (!QA_COPY_BUTTON_ENABLED || !modalElementCache) return; // Exit if flag is off or modal gone
+
+        const qaButton = modalElementCache.querySelector(`#${QA_COPY_BUTTON_ID}`);
+        if (!qaButton) return; // Exit if button somehow doesn't exist
+
+        const hasAgid = agid && agid !== 'N/A';
+        const hasPartnerId = partnerId && partnerId !== 'N/A';
+        const hasAccountName = accountName && accountName !== 'N/A';
+        const hasTaskId = taskId && taskId !== 'N/A';
+
+        const allDataAvailable = hasAgid && hasPartnerId && hasAccountName && hasTaskId;
+
+        // Clear existing success/error state if button text is not the default
+        const currentText = qaButton.textContent;
+        const originalText = 'Copy QA Info';
+        if (currentText !== originalText && (qaButton.classList.contains('success') || qaButton.classList.contains('error'))) {
+             qaButton.textContent = originalText;
+             qaButton.classList.remove('success', 'error');
+        }
+
+
+        if (allDataAvailable) {
+            qaButton.disabled = false;
+            qaButton.setAttribute('title', 'Copy QA Info');
+            // Store data in dataset for the copy handler
+            qaButton.dataset.agid = agid;
+            qaButton.dataset.partnerId = partnerId;
+            qaButton.dataset.accountName = accountName;
+            qaButton.dataset.taskId = taskId;
+        } else {
+            qaButton.disabled = true;
+            qaButton.setAttribute('title', 'Copy QA Info (Requires all fields)');
+            // Clear dataset
+            delete qaButton.dataset.agid;
+            delete qaButton.dataset.partnerId;
+            delete qaButton.dataset.accountName;
+            delete qaButton.dataset.taskId;
+        }
     }
 
     // --- Dragging and Reset Functions ---
@@ -322,6 +454,9 @@
 
         // Update External Buttons
         updateExternalLinkButtons(finalUrlData.agid, finalUrlData.partnerId);
+
+        // <<< MODIFIED: Update QA Copy Button State
+        updateQACopyButtonState(finalUrlData.agid, finalUrlData.partnerId, finalAccountName, finalUrlData.taskId);
 
         // console.log("Update complete."); // Less verbose
 
