@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    const QA_COPY_BUTTON_ENABLED = false;
+    const QA_COPY_BUTTON_ENABLED = true;
 
     // --- Configuration ---
     const TARGET_HOSTNAME = 'task-manager.biz';
@@ -16,7 +16,7 @@
     const MODAL_POSITION_LEFT_KEY = 'tmPartnerModalPosLeft';
 
     // URL Templates
-    const WSP_URL_TEMPLATE = 'https://www.websiteprodashboard.com/vdc-session/transfer/{PARTNER_ID}/{AGID}/?123';
+    const WSP_URL_TEMPLATE = 'https://www.websiteprodashboard.com/entry/{AGID}/';
     const PC_URL_TEMPLATE = 'https://partners.vendasta.com/businesses/accounts/{AGID}/details?marketId=default&_pid={PARTNER_ID}/?123';
 
     // URL Patterns for Extraction
